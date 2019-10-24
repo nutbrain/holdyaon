@@ -19,7 +19,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/js/bootstrap.min.js"
         integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous">
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.min.js"></script>
     <style>
         body {
             font-family: "kaiti";
@@ -37,9 +37,25 @@
             text-align: center;
             margin: 20px auto;
         }
-        div.habbit{
-            padding:5px 5px;
+
+        div.habbit {
+            padding: 5px 5px;
             border-radius: 5px;
+        }
+
+        div.habbit button {
+            margin: 0 10px;
+        }
+        p span{
+            color:red;
+        }
+        .foot{
+            position:fixed;
+            bottom:10px;
+            background-color: yellow;
+            border-radius: 3px;
+            padding:3px;
+            box-shadow: 3px 3px 2px grey;
         }
     </style>
 </head>
@@ -53,27 +69,37 @@
             <div class="add">
                 <label for="habbit">习惯</label>
                 <input type="text" class="form-control" style="width:60%;display: inline;" placeholder="输入要坚持的习惯"
-                    v-model.trim="habbit">
+                    v-model.trim="habbit" @keydown.enter="handleAddHabbit">
                 <button class="btn btn-primary" @click="handleAddHabbit"><span
                         class="glyphicon glyphicon-plus"></span></button>
             </div>
             <div class="habbits">
-                <div class="habbit bg-info" v-for="(h,index) in habbits">
+                <div class="habbit bg-info" v-for="(h,index) in habbits" :key="h.name">
                     <h3>
-                        {{h.name}}
+                        {{index+1}}.{{h.name}}
                     </h3>
                     已经连续坚持<span class="text-danger">{{h.holddays}}</span>天<br>
                     最近一次是<span class="text-danger">{{h.lastcheckday}}</span><br>
                     <button @click="handleDeleteHabbit(h,index)" class="btn btn-danger btn-xs">删除</button>
-                    <button @click="handleCheck(h)" :disabled="istodaycheck(h)" class="btn btn-xs" :class="{'btn-success':!istodaycheck(h)}"><span v-if="istodaycheck(h)">已打卡</span><span v-else>打卡</span></button>
+                    <button @click="handleCheck(h)" class="btn btn-xs" :class="{'btn-success':!h.ischecked}"><span
+                            v-if="h.ischecked">取消打卡</span><span v-else>昨日打卡</span></button>
+                </div>
+            </div>
+            <button class="btn btn-danger" @click="handleClear">清空记录</button>
+            <div class="logs">
+                <div class="log" v-for="(log,index) in logs">
+                    <p>
+                        <span>{{log.name}}</span>于<span>{{log.lastcheckday}}</span>之后中断，连续坚持了<span>{{log.holddays}}</span>天！
+                    </p>
                 </div>
             </div>
         </main>
         <footer class="foot">
-            this is foot
+            author:nutbrain mail:332928791@qq.com
         </footer>
     </div>
     <script>
+        let duration = 24 * 60 * 60 * 1000;
         let vm = new Vue({
             el: "#app",
             data: {
@@ -81,28 +107,81 @@
                 habbits: [],
                 habbit: "",
                 logs: [],
+                today: "",
+            },
+            created: function () {
+                this.getDate();
+                if (this.today != new Date().toLocaleDateString()) {
+                    this.today = new Date().toLocaleDateString();
+                    this.habbits.forEach(habbit => {
+                        habbit.ischecked = false;
+                        if (habbit.lastcheckday && (habbit.lastcheckday != new Date(Date.now() - 2 *
+                                    duration)
+                                .toLocaleDateString())) {
+                            this.logs.unshift({
+                                name: habbit.name,
+                                lastcheckday: habbit.lastcheckday,
+                                holddays: habbit.holddays
+                            });
+                            habbit.holddays = 0;
+                        }
+                    });
+                }
+            },
+            watch: {
+                habbits: {
+                    handler: function (val, oldval) {
+                        localStorage.setItem('habbits', JSON.stringify(val));
+                    },
+                    deep: true,
+                },
+                logs: function (val, oldval) {
+                    localStorage.setItem('logs', JSON.stringify(val));
+                },
+                today: function (val, oldval) {
+                    localStorage.setItem('today', this.today);
+                },
             },
             methods: {
-                istodaycheck(h){
-                    return h.lastcheckday==new Date().toLocaleDateString();
-                },
                 handleAddHabbit() {
-                    this.habbit && this.habbits.push({
+                    this.habbit && !this.habbits.map(h => h.name).includes(this.habbit) && this.habbits.push({
                         name: this.habbit,
                         holddays: 0,
                         lastcheckday: "",
+                        lastcheckdayback: "",
+                        ischecked: false
                     });
                     this.habbit = "";
                 },
-                handleCheck(h){
-                    h.holddays++;
-                    h.lastcheckday=new Date().toLocaleDateString();
-                },
-                handleDeleteHabbit(h,index){
-                    let sure = confirm("确定要删除习惯《"+h.name+"》吗？");
-                    if (sure) {
-                        this.habbits.splice(index,1);
+                handleCheck(h) {
+                    if (h.ischecked) {
+                        h.holddays--;
+                        h.lastcheckday = h.lastcheckdayback;
+                        h.ischecked = false;
+                    } else {
+                        h.holddays++;
+                        h.lastcheckdayback = h.lastcheckday;
+                        h.lastcheckday = new Date(Date.now() - duration).toLocaleDateString();
+                        h.ischecked = true;
                     }
+                },
+                handleDeleteHabbit(h, index) {
+                    let sure = confirm("确定要删除习惯《" + h.name + "》吗？");
+                    if (sure) {
+                        this.habbits.splice(index, 1);
+                    }
+                },
+                handleClear() {
+                    let sure = confirm("确定要清空所有习惯和记录吗？");
+                    if (sure) {
+                        localStorage.clear();
+                        this.getDate();
+                    }
+                },
+                getDate() {
+                    this.habbits = JSON.parse(localStorage.getItem('habbits') || '[]');
+                    this.logs = JSON.parse(localStorage.getItem('logs') || '[]');
+                    this.today = localStorage.getItem('today');
                 }
             }
         })
