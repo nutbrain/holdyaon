@@ -115,7 +115,7 @@
                     this.today = new Date().toLocaleDateString();
                     this.habbits.forEach(habbit => {
                         habbit.ischecked = false;
-                        if (habbit.lastcheckday && (habbit.lastcheckday != new Date(Date.now() - 2 *
+                        if (habbit.holddays && (habbit.lastcheckday != new Date(Date.now() - 2 *
                                     duration)
                                 .toLocaleDateString())) {
                             this.logs.unshift({
